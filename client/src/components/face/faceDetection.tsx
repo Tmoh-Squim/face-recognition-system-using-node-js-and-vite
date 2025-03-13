@@ -20,39 +20,54 @@ const FaceLogin = () => {
         console.log("✅ Face models loaded successfully.");
         setModelsLoaded(true);
 
-        // Set TensorFlow backend
+        // Force TensorFlow to use CPU (fix for Vercel)
         await faceapi.tf.setBackend("cpu");
         await faceapi.tf.ready();
 
-        // Start video after models are loaded
+        // Start video after models load
         await startVideo();
       } catch (err) {
-        setError("Failed to load face models. Check the /models path.");
+        console.error("❌ Model loading error:", err);
+        setError("Failed to load face models. Check /models path.");
       }
     };
 
     const startVideo = async () => {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        console.log("📷 Requesting camera access...");
+
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          throw new Error("⚠️ Camera not supported.");
+        }
+
+        const constraints = {
+          video: {
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+            facingMode: "user", // Use "environment" for rear camera
+          },
+        };
+
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        console.log("✅ Camera access granted:", stream);
         setCameraAccess(true);
+
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
-          videoRef.current
-            .play()
-            .then(() => {
-         
-            })
-            .catch(() => {
-              setError("Camera stream failed to play.");
-            });
+          await videoRef.current.play();
+          console.log("🎥 Video playback started.");
+        } else {
+          console.error("❌ Video element not found.");
         }
       } catch (err) {
-        setError("Please enable camera access in your browser settings.");
+        console.error("❌ Camera access error:", err);
+        setError("Camera access denied. Enable permissions in browser settings.");
       }
     };
 
     loadModels();
   }, []);
+  
 
   const handleFaceCapture = async (endpoint: string) => {
     if (!videoRef.current || !modelsLoaded) {
