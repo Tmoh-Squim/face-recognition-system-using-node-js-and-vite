@@ -3,7 +3,7 @@ import * as faceapi from "face-api.js";
 
 const FaceLogin = () => {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const [activeTab, setActiveTab] = useState<"login" | "register">("login");
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const [modelsLoaded, setModelsLoaded] = useState(false);
   const [cameraAccess, setCameraAccess] = useState(false);
   const [error, setError] = useState("");
@@ -20,121 +20,84 @@ const FaceLogin = () => {
         console.log("✅ Face models loaded successfully.");
         setModelsLoaded(true);
 
-        // Force TensorFlow to use CPU (fix for Vercel)
         await faceapi.tf.setBackend("cpu");
         await faceapi.tf.ready();
 
-        // Start video after models load
-        await startVideo();
+        requestCameraAccess();
       } catch (err) {
-        console.error("❌ Model loading error:", err);
-        setError("Failed to load face models. Check /models path.");
+        console.error("❌ Failed to load face models:", err);
+        setError("Failed to load face models. Check the /models path.");
       }
     };
 
-    const startVideo = async () => {
+    const requestCameraAccess = async () => {
       try {
         console.log("📷 Requesting camera access...");
-
-        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-          throw new Error("⚠️ Camera not supported.");
-        }
-
-        const constraints = {
-          video: {
-            width: { ideal: 1280 },
-            height: { ideal: 720 },
-            facingMode: "user", // Use "environment" for rear camera
-          },
-        };
-
-        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
         console.log("✅ Camera access granted:", stream);
         setCameraAccess(true);
 
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
-          await videoRef.current.play();
-          console.log("🎥 Video playback started.");
+          videoRef.current.onloadedmetadata = () => {
+            videoRef.current?.play().then(() => {
+              console.log("🎥 Video playback started.");
+              checkCanvas();
+            }).catch(err => {
+              console.error("❌ Video playback error:", err);
+              setError("Camera stream failed to play.");
+            });
+          };
         } else {
           console.error("❌ Video element not found.");
+          setError("Video element is missing in the DOM.");
         }
       } catch (err) {
-        console.error("❌ Camera access error:", err);
-        setError("Camera access denied. Enable permissions in browser settings.");
+        console.error("❌ Permission request failed:", err);
+        setError("Please enable camera and canvas access in your browser settings.");
       }
     };
 
-    loadModels();
-  }, []);
-  
+    const checkCanvas = () => {
+      if (canvasRef.current) {
+        console.log("🖼️ Checking canvas rendering permission...");
+        const ctx = canvasRef.current.getContext("2d");
+        if (!ctx) {
+          console.error("❌ Canvas rendering permission denied!");
+          setError("Canvas permission required. Please check browser settings.");
+        }
+      } else {
+        console.error("❌ Canvas element not found.");
+        setError("Canvas element is missing in the DOM.");
+      }
+    };
 
-  const handleFaceCapture = async (endpoint: string) => {
-    if (!videoRef.current || !modelsLoaded) {
-      alert("Face detection is not ready yet. Please wait.");
-      return;
+    if (!modelsLoaded) {
+      loadModels();
     }
-
-    const detections = await faceapi
-      .detectSingleFace(videoRef.current, new faceapi.TinyFaceDetectorOptions())
-      .withFaceLandmarks()
-      .withFaceDescriptor();
-
-    if (detections) {
-      fetch(endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ faceDescriptor: detections.descriptor }),
-      })
-        .then((res) => res.json())
-        .then((data) => alert(data.message))
-        .catch((err) => console.error("❌ API error:", err));
-    } else {
-      alert("⚠️ Face not recognized! Ensure your face is well-lit and clearly visible.");
-    }
-  };
+  }, [modelsLoaded]);
 
   return (
     <div style={{ textAlign: "center", padding: "20px" }}>
       <h2>Face Authentication</h2>
 
-      {/* Error Message */}
       {error && <p style={{ color: "red" }}>{error}</p>}
 
-      {/* Tab Navigation */}
-      <div style={{ marginBottom: "10px" }}>
-        <button onClick={() => setActiveTab("login")} disabled={activeTab === "login"}>
-          Login
-        </button>
-        <button onClick={() => setActiveTab("register")} disabled={activeTab === "register"}>
-          Register
-        </button>
-      </div>
-
-      {/* Video Preview */}
       {cameraAccess ? (
-        <video
-          ref={videoRef}
-          autoPlay
-          muted
-          playsInline
-          width="300"
-          height="300"
-          style={{ border: "2px solid black", background: "#000" }}
-        />
+        <div>
+          <video
+            ref={videoRef}
+            autoPlay
+            muted
+            playsInline
+            width="300"
+            height="300"
+            style={{ border: "2px solid black", background: "#000" }}
+          />
+          <canvas ref={canvasRef} style={{ display: "none" }} />
+        </div>
       ) : (
-        <p>⏳ Waiting for camera access...</p>
-      )}
-
-      {/* Active Tab Content */}
-      {activeTab === "login" ? (
-        <button onClick={() => handleFaceCapture("https://face-recognition-system-skva.onrender.com/api/auth/face-login")} disabled={!modelsLoaded}>
-          Login with Face
-        </button>
-      ) : (
-        <button onClick={() => handleFaceCapture("https://face-recognition-system-skva.onrender.com/api/auth/register-face")} disabled={!modelsLoaded}>
-          Register Face
-        </button>
+        <p>⏳ Waiting for camera and canvas access...</p>
       )}
     </div>
   );
