@@ -2,11 +2,16 @@ const express = require("express");
 const bodyParser = require("body-parser");
 const cors = require("cors");
 const faceapi = require("face-api.js");
-const tf = require("@tensorflow/tfjs-node");
 
 const app = express();
 app.use(cors());
 app.use(bodyParser.json());
+
+if (!global.tf) {
+  global.tf = require("@tensorflow/tfjs-node");
+}
+const tf = global.tf;
+
 
 let registeredUsers = {}; // Store face descriptors with user IDs
 

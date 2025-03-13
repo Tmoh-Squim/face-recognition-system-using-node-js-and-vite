@@ -42,7 +42,7 @@ const FaceLogin = () => {
             .then(() => {
          
             })
-            .catch((err) => {
+            .catch(() => {
               setError("Camera stream failed to play.");
             });
         }
