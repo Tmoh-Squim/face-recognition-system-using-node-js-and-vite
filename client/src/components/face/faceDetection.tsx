@@ -113,11 +113,11 @@ const FaceLogin = () => {
 
       {/* Active Tab Content */}
       {activeTab === "login" ? (
-        <button onClick={() => handleFaceCapture("http://localhost:5000/api/auth/face-login")} disabled={!modelsLoaded}>
+        <button onClick={() => handleFaceCapture("https://face-recognition-system-skva.onrender.com/api/auth/face-login")} disabled={!modelsLoaded}>
           Login with Face
         </button>
       ) : (
-        <button onClick={() => handleFaceCapture("http://localhost:5000/api/auth/register-face")} disabled={!modelsLoaded}>
+        <button onClick={() => handleFaceCapture("https://face-recognition-system-skva.onrender.com/api/auth/register-face")} disabled={!modelsLoaded}>
           Register Face
         </button>
       )}
